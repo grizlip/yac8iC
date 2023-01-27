@@ -12,9 +12,9 @@
 static SDL_AudioSpec audio_want;
 static SDL_AudioSpec audio_have;
 
-void AudioCallback(void* userdata, Uint8* stream, int len);
+void audio_callback(void* userdata, Uint8* stream, int len);
 uint8_t translate_sdl_key(SDL_Keycode sdl_key);
-Uint16 GetData(int sample);
+Uint16 get_sample_data(int sample);
 
 
 int main(int argc, char** argv)
@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     audio_want.format = AUDIO_S16SYS;
     audio_want.channels = 1;
     audio_want.samples = 512;
-    audio_want.callback = AudioCallback;
+    audio_want.callback = audio_callback;
     SDL_AudioDeviceID dev = SDL_OpenAudioDevice(NULL, 0, &audio_want, &audio_have, 0);
     if (dev == 0) {
         SDL_Log("Failed to open audio: %s\n", SDL_GetError());
@@ -59,9 +59,6 @@ int main(int argc, char** argv)
         if (audio_have.format != audio_want.format) { /* we let this one thing change. */
             SDL_Log("We didn't get AUDIO_S16SYS audio format.\n");
         }
-        SDL_PauseAudioDevice(dev, 0); /* start audio playing. */
-        SDL_Delay(1000); /* let the audio callback play some sound for 1 seconds. */
-        SDL_CloseAudioDevice(dev);
     }
 
     SDL_Window* window = SDL_CreateWindow("Yet another Chip8 interpreter ++", 
@@ -169,12 +166,20 @@ int main(int argc, char** argv)
             vm_tick(vm);
             elapsedMS = 0;
         }
+        if(vm->st>0) {
+            SDL_PauseAudioDevice(dev, 0);
+        }
+        else {
+            SDL_PauseAudioDevice(dev, 1);
+        }
         Uint64 end = SDL_GetPerformanceCounter();
         elapsedMS += (end - start) / (float)SDL_GetPerformanceFrequency() * 1000.0f;
     }
 
     free(raw_surface);
     vm_destroy_state(vm);
+
+    SDL_CloseAudioDevice(dev);
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
@@ -182,7 +187,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-Uint16 GetData(int sample) {
+Uint16 get_sample_data(int sample) {
     static double samplingIndex = 0;
     static const double sound_frequency = 261.63;
     static const double amplitude = 28000;
@@ -196,10 +201,10 @@ Uint16 GetData(int sample) {
     return result;
 }
 
-void AudioCallback(void*  userdata, Uint8* stream, int len) {
+void audio_callback(void*  userdata, Uint8* stream, int len) {
     Uint16* stream_16 = (Uint16 *)stream;
     for (int sample = 0; sample < audio_have.samples; sample++) {
-        Uint16 data = GetData(sample);
+        Uint16 data = get_sample_data(sample);
         for (int channelId = 0; channelId < audio_have.channels; channelId++) {
             int offset = (sample * audio_have.channels) + channelId;
             stream_16[offset] = data;
