@@ -1,4 +1,9 @@
 #include "chip_instructions.h"
+#define REG_X(args) ((args & 0x0F00)>>8)
+#define REG_Y(args) ((args & 0x00F0)>>4)
+#define NNN(args) (args & 0x0FFF)
+#define NN(args) (args & 0x00FF)
+#define N(args) (args & 0x000F)
 
 void instruction_clear_screen(chip_vm_state* state, uint16_t args) {
     for(int i =0;i<64;i++) {
@@ -35,49 +40,36 @@ void instruction_jump(chip_vm_state* state, uint16_t args) {
     if(args < 4096) {
         state->program_counter = args - 2; //to account for change in the execute function
     }
-    else
-    {
+    else {
         //TODO: error!
     }
 }
 
 void instruction_skip_value_equal(chip_vm_state* state, uint16_t args) {
-    uint8_t register_index = (args & 0x0F00) >> 8;
-    uint8_t register_value = state->registers[register_index];
-    uint8_t compare_to_value = (args & 0x00FF);
-    if(register_value == compare_to_value)
-    {
+    if(state->registers[REG_X(args)] == (NN(args))) {
         state->program_counter += 2;
     }
 }
 
 void instruction_skip_value_not_equal(chip_vm_state* state, uint16_t args) {
-    uint8_t register_index = (args & 0x0F00) >> 8;
-    uint8_t register_value = state->registers[register_index];
-    uint8_t compare_to_value = (args & 0x00FF);
-    if(register_value != compare_to_value)
-    {
+    if(state->registers[REG_X(args)] != (NN(args))) {
         state->program_counter += 2;
     }
 }
 
 void instruction_skip_register_equal(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
-    if(state->registers[reg_x_index] == state->registers[reg_y_index]) {
+    if(state->registers[REG_X(args)] == state->registers[REG_Y(args)]) {
         state->program_counter +=2;
     }
 }
 
 void instruction_set_register_immediate(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t new_register_value = args & 0x00FF;
-    state->registers[reg_x_index] = new_register_value;
+    state->registers[REG_X(args)] = NN(args);
 }
 
 void instruction_add_register_immediate(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t new_register_value = args & 0x00FF;
+    uint8_t reg_x_index = REG_X(args);
+    uint8_t new_register_value = NN(args);
     //since we have to unsigned values I think that oveflow in this case will result in wrapping modulo 2^n
     //which is exacly wahat we want
     uint8_t reg_value = state->registers[reg_x_index];
@@ -88,35 +80,30 @@ void instruction_add_register_immediate(chip_vm_state* state, uint16_t args) {
 }
 
 void instruction_set_register_register(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
-    state->registers[reg_x_index] = state->registers[reg_y_index];
+    state->registers[REG_X(args)] = state->registers[REG_Y(args)];
 }
 
 void instruction_or_register_register (chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
-    state->registers[reg_x_index] = state->registers[reg_x_index] | state->registers[reg_y_index];
+    uint8_t reg_x_index = REG_X(args);
+    state->registers[reg_x_index] = state->registers[reg_x_index] | state->registers[REG_Y(args)];
     state->registers[0xF] = 0;
 }
 
 void instruction_and_register_register(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
-    state->registers[reg_x_index] = state->registers[reg_x_index] & state->registers[reg_y_index];
+    uint8_t reg_x_index = REG_X(args);
+    state->registers[reg_x_index] = state->registers[reg_x_index] & state->registers[REG_Y(args)];
     state->registers[0xF] = 0;
 }
 
 void instruction_xor_register_register(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
-    state->registers[reg_x_index] = state->registers[reg_x_index] ^ state->registers[reg_y_index];
+    uint8_t reg_x_index = REG_X(args);
+    state->registers[reg_x_index] = state->registers[reg_x_index] ^ state->registers[REG_Y(args)];
     state->registers[0xF] = 0;
 }
 
 void instruction_add_register_register(chip_vm_state* state, uint16_t args) { 
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
+    uint8_t reg_x_index = REG_X(args);
+    uint8_t reg_y_index = REG_Y(args);
     uint16_t x = (uint16_t)state->registers[reg_x_index];
     uint16_t y = (uint16_t)state->registers[reg_y_index];
     //test for overflow
@@ -125,16 +112,16 @@ void instruction_add_register_register(chip_vm_state* state, uint16_t args) {
 }
 
 void instruction_sub_register_register(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
+    uint8_t reg_x_index = REG_X(args);
+    uint8_t reg_y_index = REG_Y(args);
     state->registers[reg_x_index] = state->registers[reg_x_index] - state->registers[reg_y_index];
     //test for underflow
     state->registers[0xF] = state->registers[reg_x_index] > state->registers[reg_y_index];
 }
 
 void instruction_shr_register_register(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
+    uint8_t reg_x_index = REG_X(args);
+    uint8_t reg_y_index = REG_Y(args);
     state->registers[reg_x_index] = state->registers[reg_y_index];
     uint8_t x_orginal = state->registers[reg_x_index] ;
     state->registers[reg_x_index] = x_orginal >> 1;
@@ -142,58 +129,48 @@ void instruction_shr_register_register(chip_vm_state* state, uint16_t args) {
 }
 
 void instruction_subn_register_register(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
+    uint8_t reg_x_index = REG_X(args);
 
     uint8_t x_orginal = state->registers[reg_x_index];
-    uint8_t y_orginal = state->registers[reg_y_index];
+    uint8_t y_orginal = state->registers[REG_Y(args)];
 
     state->registers[reg_x_index] = y_orginal - x_orginal;
     state->registers[0xF] = x_orginal < y_orginal ? 1 : 0;
 }
 
 void instruction_lhr_register_register(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
-    state->registers[reg_x_index] = state->registers[reg_y_index];
+    uint8_t reg_x_index = REG_X(args);
+    state->registers[reg_x_index] = state->registers[REG_Y(args)];
     uint8_t x_orginal = state->registers[reg_x_index] ;
     state->registers[reg_x_index] = x_orginal << 1;
     state->registers[0xF] = (x_orginal & 0x80) >> 7;
 }
 
 void instruction_skip_not_equal_register_register(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
-    if(state->registers[reg_x_index] != state->registers[reg_y_index])
-    {
+    if(state->registers[REG_X(args)] != state->registers[REG_Y(args)]) {
         state->program_counter+=2;
     }
 }
 
 void instruction_load_i_register(chip_vm_state* state, uint16_t args) {
-    state->i_register = args & 0x0FFF;
+    state->i_register = NNN(args);
 }
 
 void instruction_jump_with_offset(chip_vm_state* state, uint16_t args) {
     uint16_t base = (uint16_t)state->registers[0];
-    uint16_t offset = (uint16_t)(args & 0x0FFF);
+    uint16_t offset = (uint16_t)(NNN(args));
     state->program_counter = base + offset;
 }
 
 void instruction_random(chip_vm_state* state, uint16_t args) {
-    uint8_t kk = args & 0x00FF;
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t rand_value = rand() % 255;
-    state->registers[reg_x_index] = rand_value & kk;
+    state->registers[REG_X(args)] = (rand() % 255) & (NN(args));
 }
 
 void instruction_draw(chip_vm_state* state, uint16_t args) {
     state->registers[0xF] = 0;
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_y_index = (args & 0x00F0)>>4;
-    uint8_t sprite_length = (args & 0x000F);
-    uint8_t pos_x = state->registers[reg_x_index];
-    uint8_t pos_y = state->registers[reg_y_index];
+    uint8_t sprite_length = N(args);
+    uint8_t pos_x = state->registers[REG_X(args)];
+    uint8_t pos_y = state->registers[REG_Y(args)];
 
     uint8_t row_beginning = (pos_x % 64);
     uint8_t y = (pos_y % 32);
@@ -236,8 +213,7 @@ void instruction_draw(chip_vm_state* state, uint16_t args) {
 }
 
 void instruction_skip_key_pressed(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t key_index = state->registers[reg_x_index];
+    uint8_t key_index = state->registers[REG_X(args)];
     if(key_index >0xF) {
         //TODO: error!
     }
@@ -249,8 +225,7 @@ void instruction_skip_key_pressed(chip_vm_state* state, uint16_t args) {
 }
 
 void instruction_skip_key_not_pressed(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t key_index = state->registers[reg_x_index];
+    uint8_t key_index = state->registers[REG_X(args)];
     if(key_index >0xF) {
         //TODO: error!
     }
@@ -262,13 +237,10 @@ void instruction_skip_key_not_pressed(chip_vm_state* state, uint16_t args) {
 }
 
 void instruction_read_delay(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    state->registers[reg_x_index] = state->dt;
+    state->registers[REG_X(args)] = state->dt;
 }
 
 void instruction_wait_key_pressed(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-
     if(state->pressed_keys == 0) {
         state->program_counter -=2;
     }
@@ -280,23 +252,20 @@ void instruction_wait_key_pressed(chip_vm_state* state, uint16_t args) {
                 break;
             }
         }
-        state->registers[reg_x_index] = i;
+        state->registers[REG_X(args)] = i;
     }
 }
 
 void instruction_set_delay(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    state->dt = state->registers[reg_x_index];
+    state->dt = state->registers[REG_X(args)];
 }
 
 void instruction_set_sound(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    state->st = state->registers[reg_x_index];
+    state->st = state->registers[REG_X(args)];
 }
 
 void instruction_set_i(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    state->i_register += state->registers[reg_x_index];
+    state->i_register += state->registers[REG_X(args)];
 
     if((state->i_register & 0xF000) >0) {
         state->registers[0xF] = 1;
@@ -304,13 +273,11 @@ void instruction_set_i(chip_vm_state* state, uint16_t args) {
 }
 
 void instruction_font_character(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    state->i_register = (uint16_t)(state->registers[reg_x_index] * 5);
+    state->i_register = (uint16_t)(state->registers[REG_X(args)] * 5);
 }
 
 void instruction_binary_decimal_conversion(chip_vm_state* state, uint16_t args) {
-    uint8_t reg_x_index = (args & 0x0F00)>>8;
-    uint8_t reg_value = state->registers[reg_x_index];
+    uint8_t reg_value = state->registers[REG_X(args)];
 
     for(int i = 2; i >=0; i--) {
         if(state->i_register + i >=4096) {
@@ -325,7 +292,7 @@ void instruction_binary_decimal_conversion(chip_vm_state* state, uint16_t args) 
 }
 
 void instruction_write_memory(chip_vm_state* state, uint16_t args) {
-    uint8_t last_register_index = (args & 0x0F00)>>8;
+    uint8_t last_register_index = REG_X(args);
     for(int i =0;i<=last_register_index;i++) {
         state->memory[state->i_register + i] = state->registers[i];
     }
@@ -333,7 +300,7 @@ void instruction_write_memory(chip_vm_state* state, uint16_t args) {
 }
 
 void instruction_load_memory(chip_vm_state* state, uint16_t args) {
-    uint8_t last_register_index = (args & 0x0F00)>>8;
+    uint8_t last_register_index = REG_X(args);
     for(int i =0;i<=last_register_index;i++) {
         state->registers[i] = state->memory[state->i_register + i];
     }
