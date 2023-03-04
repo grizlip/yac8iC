@@ -20,10 +20,13 @@ Uint16 get_sample_data(int sample);
 int main(int argc, char** argv)
 {
     if(argc <2) {
-        SDL_Log("Rom path as an arugment needed");
+        SDL_Log("Rom path as an argument needed");
         return -1;
     }
-    FILE *fp = fopen(argv[1], "rb"); 
+    FILE *fp;
+    if(fopen_s(&fp, argv[1], "rb") != 0) {
+        SDL_Log("Error opening file %s", argv[1]);
+    }
     uint8_t* program = (uint8_t*)malloc((4096-512) * sizeof(uint8_t));
     size_t program_size = fread(program, sizeof(uint8_t), (4096-512),fp);
     if(program_size<=0) {
